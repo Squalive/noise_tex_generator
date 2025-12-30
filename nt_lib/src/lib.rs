@@ -11,7 +11,7 @@ use noise::NoiseFn;
 
 #[derive(Debug, Clone)]
 pub struct NoiseTextureDescriptor<C: Channels> {
-    size: [u32; 3],
+    pub size: [u32; 3],
     channel_configs: [ChannelConfig; 4],
     channel_swizzles: ChannelSwizzles,
     channels: C,
