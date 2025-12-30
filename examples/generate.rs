@@ -1,11 +1,11 @@
 use noise::{Constant, Negate, Worley};
-use nt_lib::{ChannelSwizzles, NoiseTextureDescriptor};
+use nt_lib::{ChannelBounds, ChannelSwizzles, NoiseChannelEx, NoiseTextureDescriptor};
 use nvtt_rs::{CUDA_SUPPORTED, CompressionOptions, Context, InputFormat, OutputOptions, Surface};
 
 fn main() {
     let width = 128;
     let height = 128;
-    let depth = 128;
+    let depth = 1;
 
     let bounds = (0.0, 8.0);
     // output_with_planemap(width, height, bounds);
@@ -42,11 +42,10 @@ fn output_with_nvtt(width: u32, height: u32, depth: u32, bounds: (f64, f64)) {
     );
     let data = NoiseTextureDescriptor::default()
         .with_size([width, height, depth])
-        .with_bounds([bounds; 3])
         .with_seamless(true)
         .with_channel_swizzles(ChannelSwizzles::Bgra)
         .with_rgba(
-            noise,
+            noise.with_bounds(ChannelBounds::splat(bounds)),
             Constant::new(-1.0),
             Constant::new(-1.0),
             Constant::new(1.0),
