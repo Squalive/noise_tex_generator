@@ -1,5 +1,5 @@
 use noise::{Constant, Negate, Worley};
-use noise_tex::NoiseTextureDescriptor;
+use nt_lib::{ChannelSwizzles, NoiseTextureDescriptor};
 use nvtt_rs::{CUDA_SUPPORTED, CompressionOptions, Context, InputFormat, OutputOptions, Surface};
 
 fn main() {
@@ -44,10 +44,13 @@ fn output_with_nvtt(width: u32, height: u32, depth: u32, bounds: (f64, f64)) {
         .with_size([width, height, depth])
         .with_bounds([bounds; 3])
         .with_seamless(true)
-        .with_r(noise)
-        .with_g(Constant::new(-1.0))
-        .with_b(Constant::new(-1.0))
-        .with_a(Constant::new(1.0))
+        .with_channel_swizzles(ChannelSwizzles::Bgra)
+        .with_rgba(
+            noise,
+            Constant::new(-1.0),
+            Constant::new(-1.0),
+            Constant::new(1.0),
+        )
         .to_texture();
 
     let input = InputFormat::Bgra8Ub {

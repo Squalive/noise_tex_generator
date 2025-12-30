@@ -17,7 +17,7 @@ image = "0.25.9"
 nvtt_rs = { git = "https://github.com/Squalive/nvtt.git", features = ["cuda"] }
 
 [workspace]
-members = ["nt", "nt_lib"]
+members = ["nt_lib"]
 
 [[example]]
 name = "generate"

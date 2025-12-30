@@ -4,19 +4,17 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
-use core::ops::{Add, Mul};
-
 use alloc::vec;
 use alloc::vec::Vec;
+use core::ops::{Add, Mul};
 use noise::NoiseFn;
-
-type NoiseT = f64;
 
 #[derive(Debug, Clone)]
 pub struct NoiseTextureDescriptor<C: Channels> {
     size: [u32; 3],
     bounds: [(f64, f64); 3],
     seamless: bool,
+    channel_swizzles: ChannelSwizzles,
     channels: C,
 }
 
@@ -26,6 +24,7 @@ impl Default for NoiseTextureDescriptor<()> {
             size: [1, 1, 1],
             bounds: [(0.0, 1.0); 3],
             seamless: false,
+            channel_swizzles: ChannelSwizzles::default(),
             channels: (),
         }
     }
@@ -45,6 +44,75 @@ impl<C: Channels> NoiseTextureDescriptor<C> {
     pub fn with_seamless(mut self, seamless: bool) -> Self {
         self.seamless = seamless;
         self
+    }
+
+    pub fn with_channel_swizzles(mut self, channel_swizzles: ChannelSwizzles) -> Self {
+        self.channel_swizzles = channel_swizzles;
+        self
+    }
+
+    pub fn with_r<R>(self, r: R) -> NoiseTextureDescriptor<ChannelR<R>>
+    where
+        R: NoiseFn<f64, 3>,
+    {
+        NoiseTextureDescriptor {
+            size: self.size,
+            bounds: self.bounds,
+            seamless: self.seamless,
+            channel_swizzles: self.channel_swizzles,
+            channels: ChannelR(r),
+        }
+    }
+
+    pub fn with_rg<R, G>(self, r: R, g: G) -> NoiseTextureDescriptor<ChannelRg<R, G>>
+    where
+        R: NoiseFn<f64, 3>,
+        G: NoiseFn<f64, 3>,
+    {
+        NoiseTextureDescriptor {
+            size: self.size,
+            bounds: self.bounds,
+            seamless: self.seamless,
+            channel_swizzles: self.channel_swizzles,
+            channels: ChannelRg(r, g),
+        }
+    }
+
+    pub fn with_rgb<R, G, B>(self, r: R, g: G, b: B) -> NoiseTextureDescriptor<ChannelRgb<R, G, B>>
+    where
+        R: NoiseFn<f64, 3>,
+        G: NoiseFn<f64, 3>,
+        B: NoiseFn<f64, 3>,
+    {
+        NoiseTextureDescriptor {
+            size: self.size,
+            bounds: self.bounds,
+            seamless: self.seamless,
+            channel_swizzles: self.channel_swizzles,
+            channels: ChannelRgb(r, g, b),
+        }
+    }
+
+    pub fn with_rgba<R, G, B, A>(
+        self,
+        r: R,
+        g: G,
+        b: B,
+        a: A,
+    ) -> NoiseTextureDescriptor<ChannelRgba<R, G, B, A>>
+    where
+        R: NoiseFn<f64, 3>,
+        G: NoiseFn<f64, 3>,
+        B: NoiseFn<f64, 3>,
+        A: NoiseFn<f64, 3>,
+    {
+        NoiseTextureDescriptor {
+            size: self.size,
+            bounds: self.bounds,
+            seamless: self.seamless,
+            channel_swizzles: self.channel_swizzles,
+            channels: ChannelRgba(r, g, b, a),
+        }
     }
 
     pub fn to_texture(&self) -> Vec<u8> {
@@ -149,6 +217,11 @@ impl<C: Channels> NoiseTextureDescriptor<C> {
                     self.channels.get([cur_x, cur_y, cur_z])
                 };
 
+                let [r, g, b, a] = match self.channel_swizzles {
+                    ChannelSwizzles::Rgba => [r, g, b, a],
+                    ChannelSwizzles::Bgra => [b, g, r, a],
+                };
+
                 // Calculate base index in data array for this pixel
                 let base_index = index * C::channel_count();
 
@@ -180,204 +253,17 @@ impl<C: Channels> NoiseTextureDescriptor<C> {
     }
 }
 
-impl NoiseTextureDescriptor<()> {
-    pub fn with_r<T: NoiseFn<NoiseT, 3>>(self, noise: T) -> NoiseTextureDescriptor<ChannelR<T>> {
-        let Self {
-            size,
-            bounds,
-            seamless,
-            ..
-        } = self;
-        NoiseTextureDescriptor {
-            size,
-            bounds,
-            seamless,
-            channels: ChannelR(noise),
-        }
-    }
-}
-
-impl<R> NoiseTextureDescriptor<ChannelR<R>>
-where
-    R: NoiseFn<NoiseT, 3>,
-{
-    pub fn with_r<T: NoiseFn<NoiseT, 3>>(self, noise: T) -> NoiseTextureDescriptor<ChannelR<T>> {
-        let Self {
-            size,
-            bounds,
-            seamless,
-            ..
-        } = self;
-        NoiseTextureDescriptor {
-            size,
-            bounds,
-            seamless,
-            channels: ChannelR(noise),
-        }
-    }
-
-    pub fn with_g<T: NoiseFn<NoiseT, 3>>(
-        self,
-        noise: T,
-    ) -> NoiseTextureDescriptor<ChannelRg<R, T>> {
-        let Self {
-            size,
-            bounds,
-            seamless,
-            channels: ChannelR(r),
-        } = self;
-        NoiseTextureDescriptor {
-            size,
-            bounds,
-            seamless,
-            channels: ChannelRg(r, noise),
-        }
-    }
-}
-
-impl<R, G> NoiseTextureDescriptor<ChannelRg<R, G>>
-where
-    R: NoiseFn<NoiseT, 3>,
-    G: NoiseFn<NoiseT, 3>,
-{
-    pub fn with_r<T: NoiseFn<NoiseT, 3>>(
-        self,
-        noise: T,
-    ) -> NoiseTextureDescriptor<ChannelRg<T, G>> {
-        let Self {
-            size,
-            bounds,
-            seamless,
-            channels: ChannelRg(_, g),
-        } = self;
-        NoiseTextureDescriptor {
-            size,
-            bounds,
-            seamless,
-            channels: ChannelRg(noise, g),
-        }
-    }
-
-    pub fn with_g<T: NoiseFn<NoiseT, 3>>(
-        self,
-        noise: T,
-    ) -> NoiseTextureDescriptor<ChannelRg<R, T>> {
-        let Self {
-            size,
-            bounds,
-            seamless,
-            channels: ChannelRg(r, _),
-        } = self;
-        NoiseTextureDescriptor {
-            size,
-            bounds,
-            seamless,
-            channels: ChannelRg(r, noise),
-        }
-    }
-
-    pub fn with_b<T: NoiseFn<NoiseT, 3>>(
-        self,
-        noise: T,
-    ) -> NoiseTextureDescriptor<ChannelRgb<R, G, T>> {
-        let Self {
-            size,
-            bounds,
-            seamless,
-            channels: ChannelRg(r, g),
-        } = self;
-        NoiseTextureDescriptor {
-            size,
-            bounds,
-            seamless,
-            channels: ChannelRgb(r, g, noise),
-        }
-    }
-}
-
-impl<R, G, B> NoiseTextureDescriptor<ChannelRgb<R, G, B>>
-where
-    R: NoiseFn<NoiseT, 3>,
-    G: NoiseFn<NoiseT, 3>,
-    B: NoiseFn<NoiseT, 3>,
-{
-    pub fn with_r<T: NoiseFn<NoiseT, 3>>(
-        self,
-        noise: T,
-    ) -> NoiseTextureDescriptor<ChannelRgb<T, G, B>> {
-        let Self {
-            size,
-            bounds,
-            seamless,
-            channels: ChannelRgb(_, g, b),
-        } = self;
-        NoiseTextureDescriptor {
-            size,
-            bounds,
-            seamless,
-            channels: ChannelRgb(noise, g, b),
-        }
-    }
-
-    pub fn with_g<T: NoiseFn<NoiseT, 3>>(
-        self,
-        noise: T,
-    ) -> NoiseTextureDescriptor<ChannelRgb<R, T, B>> {
-        let Self {
-            size,
-            bounds,
-            seamless,
-            channels: ChannelRgb(r, _, b),
-        } = self;
-        NoiseTextureDescriptor {
-            size,
-            bounds,
-            seamless,
-            channels: ChannelRgb(r, noise, b),
-        }
-    }
-
-    pub fn with_b<T: NoiseFn<NoiseT, 3>>(
-        self,
-        noise: T,
-    ) -> NoiseTextureDescriptor<ChannelRgb<R, G, T>> {
-        let Self {
-            size,
-            bounds,
-            seamless,
-            channels: ChannelRgb(r, g, _),
-        } = self;
-        NoiseTextureDescriptor {
-            size,
-            bounds,
-            seamless,
-            channels: ChannelRgb(r, g, noise),
-        }
-    }
-
-    pub fn with_a<T: NoiseFn<NoiseT, 3>>(
-        self,
-        noise: T,
-    ) -> NoiseTextureDescriptor<ChannelRgba<R, G, B, T>> {
-        let Self {
-            size,
-            bounds,
-            seamless,
-            channels: ChannelRgb(r, g, b),
-        } = self;
-        NoiseTextureDescriptor {
-            size,
-            bounds,
-            seamless,
-            channels: ChannelRgba(r, g, b, noise),
-        }
-    }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum ChannelSwizzles {
+    #[default]
+    Rgba,
+    Bgra,
 }
 
 pub trait Channels {
     fn channel_count() -> usize;
 
-    fn get(&self, point: [NoiseT; 3]) -> [f64; 4];
+    fn get(&self, point: [f64; 3]) -> [f64; 4];
 }
 
 impl Channels for () {
@@ -387,7 +273,7 @@ impl Channels for () {
     }
 
     #[inline(always)]
-    fn get(&self, _: [NoiseT; 3]) -> [f64; 4] {
+    fn get(&self, _: [f64; 3]) -> [f64; 4] {
         unreachable!()
     }
 }
@@ -397,7 +283,7 @@ pub struct ChannelR<R>(R);
 
 impl<R> Channels for ChannelR<R>
 where
-    R: NoiseFn<NoiseT, 3>,
+    R: NoiseFn<f64, 3>,
 {
     #[inline(always)]
     fn channel_count() -> usize {
@@ -405,7 +291,7 @@ where
     }
 
     #[inline(always)]
-    fn get(&self, point: [NoiseT; 3]) -> [f64; 4] {
+    fn get(&self, point: [f64; 3]) -> [f64; 4] {
         let Self(r) = self;
         [r.get(point), 0.0, 0.0, 0.0]
     }
@@ -416,8 +302,8 @@ pub struct ChannelRg<R, G>(R, G);
 
 impl<R, G> Channels for ChannelRg<R, G>
 where
-    R: NoiseFn<NoiseT, 3>,
-    G: NoiseFn<NoiseT, 3>,
+    R: NoiseFn<f64, 3>,
+    G: NoiseFn<f64, 3>,
 {
     #[inline(always)]
     fn channel_count() -> usize {
@@ -425,7 +311,7 @@ where
     }
 
     #[inline(always)]
-    fn get(&self, point: [NoiseT; 3]) -> [f64; 4] {
+    fn get(&self, point: [f64; 3]) -> [f64; 4] {
         let Self(r, g) = self;
         [r.get(point), g.get(point), 0.0, 0.0]
     }
@@ -436,9 +322,9 @@ pub struct ChannelRgb<R, G, B>(R, G, B);
 
 impl<R, G, B> Channels for ChannelRgb<R, G, B>
 where
-    R: NoiseFn<NoiseT, 3>,
-    G: NoiseFn<NoiseT, 3>,
-    B: NoiseFn<NoiseT, 3>,
+    R: NoiseFn<f64, 3>,
+    G: NoiseFn<f64, 3>,
+    B: NoiseFn<f64, 3>,
 {
     #[inline(always)]
     fn channel_count() -> usize {
@@ -446,7 +332,7 @@ where
     }
 
     #[inline(always)]
-    fn get(&self, point: [NoiseT; 3]) -> [f64; 4] {
+    fn get(&self, point: [f64; 3]) -> [f64; 4] {
         let Self(r, g, b) = self;
         [r.get(point), g.get(point), b.get(point), 0.0]
     }
@@ -457,10 +343,10 @@ pub struct ChannelRgba<R, G, B, A>(R, G, B, A);
 
 impl<R, G, B, A> Channels for ChannelRgba<R, G, B, A>
 where
-    R: NoiseFn<NoiseT, 3>,
-    G: NoiseFn<NoiseT, 3>,
-    B: NoiseFn<NoiseT, 3>,
-    A: NoiseFn<NoiseT, 3>,
+    R: NoiseFn<f64, 3>,
+    G: NoiseFn<f64, 3>,
+    B: NoiseFn<f64, 3>,
+    A: NoiseFn<f64, 3>,
 {
     #[inline(always)]
     fn channel_count() -> usize {
@@ -468,7 +354,7 @@ where
     }
 
     #[inline(always)]
-    fn get(&self, point: [NoiseT; 3]) -> [f64; 4] {
+    fn get(&self, point: [f64; 3]) -> [f64; 4] {
         let Self(r, g, b, a) = self;
         [r.get(point), g.get(point), b.get(point), a.get(point)]
     }
