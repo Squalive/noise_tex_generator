@@ -573,5 +573,5 @@ where
 }
 
 fn normalize_noise_to_u8(noise: f64) -> u8 {
-    (noise * 255.0) as u8
+    ((noise * 0.5 + 0.5) * 255.0) as u8
 }
